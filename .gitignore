@@ -1,0 +1,5 @@
+/target
+**/*.rs.bk
+
+# App Specific
+config.toml
