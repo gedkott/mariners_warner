@@ -13,85 +13,65 @@ mod twilio;
 
 fn main() {
     let mut settings = config::Config::default();
+    settings.merge(config::File::with_name("config")).expect(
+        "you must supply a config file named config.toml matching config.template.toml's structure",
+    );
+    let app_config = settings.try_into::<HashMap<String, String>>().expect(
+        "you must supply a config file named config.toml matching config.template.toml's structure",
+    );
 
-    settings.merge(config::File::with_name("config")).unwrap();
-
-    let app_config = settings.try_into::<HashMap<String, String>>().unwrap();
-
-    // Print out our settings (as a HashMap)
-    println!("{:?}", app_config);
-
-    let from = sync::Arc::new(sync::Mutex::new(app_config.get("from").unwrap().clone()));
-    let to = sync::Arc::new(sync::Mutex::new(app_config.get("to").unwrap().clone()));
-    let twilio_account_id = sync::Arc::new(sync::Mutex::new(
-        app_config.get("twilio_account_id").unwrap().clone(),
-    ));
-    let twilio_access_token = sync::Arc::new(sync::Mutex::new(
-        app_config.get("twilio_access_token").unwrap().clone(),
-    ));
+    let from = sync::Arc::new(app_config.get("from").expect("config.toml must define a from phone number in the form \"\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d\"").clone());
+    let to = sync::Arc::new(app_config.get("to").expect("config.toml must define a to phone number in the form \"\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d\"").clone());
+    let twilio_account_id = sync::Arc::new(
+        app_config
+            .get("twilio_account_id")
+            .expect("config.toml must define a twilio_account_id")
+            .clone(),
+    );
+    let twilio_access_token = sync::Arc::new(
+        app_config
+            .get("twilio_access_token")
+            .expect("config.toml must define a twilio_access_token")
+            .clone(),
+    );
 
     let filename = "seattle-mariners-home-schedule.csv";
 
-    let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
+    let contents =
+        fs::read_to_string(filename).unwrap_or_else(|_| panic!("Something went wrong reading {}", filename));
 
     let real_rows = csv_reader::read_rows(&contents);
     let fake_start_date_time = Utc::now() + time::Duration::seconds(5);
-    let fake_sleep_time = fake_start_date_time.timestamp_millis() - Utc::now().timestamp_millis();
-    let fake_game = (
-        game_parser::Game::PerfectlyScheduledGame {
-            start_date_time: fake_start_date_time,
-        },
-        fake_sleep_time,
-        from.clone(),
-        to.clone(),
-        twilio_account_id.clone(),
-        twilio_access_token.clone(),
-    );
+    let fake_game = game_parser::Game::PerfectlyScheduledGame {
+        start_date_time: fake_start_date_time,
+    };
 
-    let mut games: Vec<(
-        game_parser::Game,
-        i64,
-        sync::Arc<sync::Mutex<String>>,
-        sync::Arc<sync::Mutex<String>>,
-        sync::Arc<sync::Mutex<String>>,
-        sync::Arc<sync::Mutex<String>>,
-    )> = real_rows
+    let mut perfectly_scheduled_games: Vec<game_parser::Game> = real_rows
         .iter()
-        .filter_map(|row| {
-            let game = game_parser::parse_game_from(row);
-            let r = match game {
-                Some(game_parser::Game::PerfectlyScheduledGame { start_date_time }) => {
-                    let time_to_sleep =
-                        start_date_time.timestamp_millis() - Utc::now().timestamp_millis();
-                    if time_to_sleep > 0 {
-                        let from = from.clone();
-                        let to = to.clone();
-                        let twilio_account_id = twilio_account_id.clone();
-                        let twilio_access_token = twilio_access_token.clone();
-                        Some((
-                            game.unwrap().clone(),
-                            time_to_sleep,
-                            from,
-                            to,
-                            twilio_account_id,
-                            twilio_access_token,
-                        ))
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            };
-            r
+        .filter_map(|row| match game_parser::parse_game_from(row) {
+            Some(game_parser::Game::PerfectlyScheduledGame { start_date_time }) => {
+                Some(game_parser::Game::PerfectlyScheduledGame { start_date_time })
+            }
+            _ => None,
         })
         .collect();
 
-    games.push(fake_game);
+    perfectly_scheduled_games.push(fake_game);
 
-    let jobs = games.into_iter().filter_map(
-            |(game, time_to_sleep, from, to, twilio_account_id, twilio_access_token)| -> Option<sync::Arc<Fn() -> () + Send + Sync>> {
-                match game {
-                    game_parser::Game::PerfectlyScheduledGame { start_date_time } => {
+    let jobs = perfectly_scheduled_games
+        .into_iter()
+        .filter_map(|game| -> Option<sync::Arc<Fn() -> () + Send + Sync>> {
+            match game {
+                game_parser::Game::PerfectlyScheduledGame { start_date_time } => {
+                    let from = from.clone();
+                    let to = to.clone();
+                    let twilio_account_id = twilio_account_id.clone();
+                    let twilio_access_token = twilio_access_token.clone();
+                    let time_to_sleep =
+                        start_date_time.timestamp_millis() - Utc::now().timestamp_millis();
+                    if time_to_sleep <= 0 {
+                        None
+                    } else {
                         Some(sync::Arc::new(move || {
                             println!(
                                 "sleeping for {:?} (u64) for game on {:?} at {:?}",
@@ -104,16 +84,18 @@ fn main() {
                                     .time()
                             );
                             thread::sleep(native_time::Duration::from_millis(time_to_sleep as u64));
-                            println!("Game starting");
-
-                            let r = twilio::send_text_message(&from.lock().unwrap(), &to.lock().unwrap(), &twilio_account_id.lock().unwrap(), &twilio_access_token.lock().unwrap());
-                            println!("{:?}", r)
+                            twilio::send_text_message(
+                                &from,
+                                &to,
+                                &twilio_account_id,
+                                &twilio_access_token,
+                            );
                         }))
                     }
-                    _ => None,
                 }
-            },
-        )
+                _ => None,
+            }
+        })
         .collect();
 
     async_latch::wait(jobs)
