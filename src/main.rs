@@ -21,7 +21,9 @@ fn main() {
     );
 
     let from = app_config.get("from").expect("config.toml must define a from phone number in the form \"\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d\"");
-    let to = app_config.get("to").expect("config.toml must define a to phone number in the form \"\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d\"");
+    let to = app_config.get("to").expect(
+        "config.toml must define a to phone number in the form \"\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d\"",
+    );
     let twilio_account_id = app_config
         .get("twilio_account_id")
         .expect("config.toml must define a twilio_account_id");
