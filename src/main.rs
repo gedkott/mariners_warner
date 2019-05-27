@@ -20,25 +20,19 @@ fn main() {
         "you must supply a config file named config.toml matching config.template.toml's structure",
     );
 
-    let from = sync::Arc::new(app_config.get("from").expect("config.toml must define a from phone number in the form \"\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d\"").clone());
-    let to = sync::Arc::new(app_config.get("to").expect("config.toml must define a to phone number in the form \"\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d\"").clone());
-    let twilio_account_id = sync::Arc::new(
-        app_config
-            .get("twilio_account_id")
-            .expect("config.toml must define a twilio_account_id")
-            .clone(),
-    );
-    let twilio_access_token = sync::Arc::new(
-        app_config
-            .get("twilio_access_token")
-            .expect("config.toml must define a twilio_access_token")
-            .clone(),
-    );
+    let from = app_config.get("from").expect("config.toml must define a from phone number in the form \"\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d\"");
+    let to = app_config.get("to").expect("config.toml must define a to phone number in the form \"\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d\"");
+    let twilio_account_id = app_config
+        .get("twilio_account_id")
+        .expect("config.toml must define a twilio_account_id");
+    let twilio_access_token = app_config
+        .get("twilio_access_token")
+        .expect("config.toml must define a twilio_access_token");
 
     let filename = "seattle-mariners-home-schedule.csv";
 
-    let contents =
-        fs::read_to_string(filename).unwrap_or_else(|_| panic!("Something went wrong reading {}", filename));
+    let contents = fs::read_to_string(filename)
+        .unwrap_or_else(|_| panic!("Something went wrong reading {}", filename));
 
     let real_rows = csv_reader::read_rows(&contents);
     let fake_start_date_time = Utc::now() + time::Duration::seconds(5);
