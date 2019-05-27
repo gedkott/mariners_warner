@@ -88,11 +88,11 @@ fn main() {
 
     games.push(fake_game);
 
-    let jobs = games.into_iter().map(
-            |(game, time_to_sleep, from, to, twilio_account_id, twilio_access_token)| -> sync::Arc<sync::Mutex<Fn() + Send>> {
+    let jobs = games.into_iter().filter_map(
+            |(game, time_to_sleep, from, to, twilio_account_id, twilio_access_token)| -> Option<sync::Arc<Fn() -> () + Send + Sync>> {
                 match game {
                     game_parser::Game::PerfectlyScheduledGame { start_date_time } => {
-                        sync::Arc::new(sync::Mutex::new(move || {
+                        Some(sync::Arc::new(move || {
                             println!(
                                 "sleeping for {:?} (u64) for game on {:?} at {:?}",
                                 time_to_sleep as u64,
@@ -110,7 +110,7 @@ fn main() {
                             println!("{:?}", r)
                         }))
                     }
-                    _ => sync::Arc::new(sync::Mutex::new(move || ())),
+                    _ => None,
                 }
             },
         )
