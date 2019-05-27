@@ -91,9 +91,6 @@ mod tests {
                 "uri": "/2010-04-01/Accounts/ABCD1234/Messages/SMXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.json"
             }"#;
 
-        // Parse the string of data into a Person object. This is exactly the
-        // same function as the one that produced serde_json::Value above, but
-        // now we are asking it for a Person as output.
         let response: TwilioResponse = match serde_json::from_str(data) {
             Ok(r) => r,
             Err(e) => {
