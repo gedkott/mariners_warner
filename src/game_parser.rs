@@ -21,17 +21,8 @@ pub enum Game {
 }
 
 pub fn parse_game_from(csv_row: &[&str]) -> Option<Game> {
-    let start_day_col = match csv_row.get(0) {
-        Some(x) => x,
-        None => "",
-    };
-    let start_day = parse_start_day(start_day_col);
-
-    let start_time_col = match csv_row.get(1) {
-        Some(x) => x,
-        None => "",
-    };
-    let start_time = parse_start_time(start_time_col);
+    let start_day = csv_row.get(0).and_then(parse_start_day);
+    let start_time = csv_row.get(1).and_then(parse_start_time);
 
     match (&start_day, &start_time) {
         (Some(x), Some(y)) => create_perfect_game(x, y),
@@ -49,7 +40,7 @@ pub fn parse_game_from(csv_row: &[&str]) -> Option<Game> {
     }
 }
 
-fn parse_start_day(c: &str) -> Option<String> {
+fn parse_start_day(c: &&str) -> Option<String> {
     if contains_number_like_chars(c) {
         Some(c.to_string())
     } else {
@@ -57,9 +48,9 @@ fn parse_start_day(c: &str) -> Option<String> {
     }
 }
 
-fn parse_start_time(c: &str) -> Option<&str> {
+fn parse_start_time(c: &&str) -> Option<String> {
     if contains_number_like_chars(c) {
-        Some(c)
+        Some(c.to_string())
     } else {
         None
     }
@@ -90,7 +81,7 @@ fn transform_mariners_date_and_time(date_str: &str, time_str: &str) -> String {
         _ => date_str.to_owned(),
     };
 
-    let time_and_meridiem = time_str.split(' ').collect::<Vec<&str>>();
+    let time_and_meridiem: Vec<&str> = time_str.split(' ').collect();
 
     let time_pieces: Vec<u8> = time_and_meridiem[0]
         .split(':')
