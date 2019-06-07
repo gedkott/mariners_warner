@@ -1,7 +1,7 @@
 use std::sync::mpsc::{channel, Sender};
-use std::{sync, thread};
+use std::thread;
 
-pub fn wait(jobs: Vec<sync::Arc<Fn() -> () + Sync + Send>>) {
+pub fn wait(jobs: Vec<Box<Fn() -> () + Send>>) {
     let (tx, rx) = channel();
     let total_jobs = jobs.len();
     for job in jobs {
@@ -27,14 +27,14 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let a = sync::Arc::new(|| {
+        let a = Box::new(|| {
             let wait_time = 100;
             println!("sleeping for {:?}", wait_time);
             thread::sleep(time::Duration::from_millis(wait_time as u64));
             println!("awaking after {:?}", wait_time)
         });
 
-        let b = sync::Arc::new(|| {
+        let b = Box::new(|| {
             let wait_time = 50;
             println!("sleeping for {:?}", wait_time);
             thread::sleep(time::Duration::from_millis(wait_time as u64));
