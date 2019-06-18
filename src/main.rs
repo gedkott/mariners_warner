@@ -6,7 +6,7 @@ extern crate time;
 extern crate log;
 extern crate simplelog;
 
-use chrono::{FixedOffset, Utc};
+use chrono::{Duration, FixedOffset, Utc};
 use simplelog::*;
 use std::collections::HashMap;
 use std::fs::File;
@@ -69,22 +69,31 @@ fn main() {
 
     let jobs = perfectly_scheduled_games
         .into_iter()
-        .filter_map(|game| -> Option<Box<Fn() -> () + Send>> {
+        .filter_map(|game| -> Option<Vec<i64>> {
             match game {
                 game_parser::Game::PerfectlyScheduledGame { start_date_time } => {
-                    let from = from.clone();
-                    let to = to.clone();
-                    let twilio_account_id = twilio_account_id.clone();
-                    let twilio_access_token = twilio_access_token.clone();
-                    let time_to_sleep =
+                    let game_time: i64 =
                         start_date_time.timestamp_millis() - Utc::now().timestamp_millis();
-                    if time_to_sleep <= 0 {
+                    if game_time <= 0 {
                         None
                     } else {
-                        Some(Box::new(move || {
+                        let mut times_to_alert: Vec<i64> = (1..4)
+                            .map(|hours: i64| -> Vec<i64> {
+                                let duration = Duration::hours(hours);
+                                let times_to_go =
+                                    vec![start_date_time - duration, start_date_time + duration];
+                                times_to_go
+                                    .iter()
+                                    .map(|x| x.timestamp_millis())
+                                    .collect()
+                            })
+                            .flatten()
+                            .collect();
+                        times_to_alert.push(game_time);
+                        for time in &times_to_alert {
                             info!(
                                 "sleeping for {:?} (u64) for game on {:?} at {:?}",
-                                time_to_sleep as u64,
+                                *time as u64,
                                 start_date_time
                                     .with_timezone(&FixedOffset::west(7 * 3600))
                                     .date(),
@@ -92,22 +101,34 @@ fn main() {
                                     .with_timezone(&FixedOffset::west(7 * 3600))
                                     .time()
                             );
-                            thread::sleep(native_time::Duration::from_millis(time_to_sleep as u64));
-                            twilio::send_text_message(
-                                &from,
-                                &to,
-                                &twilio_account_id,
-                                &twilio_access_token,
-                                &twilio::CommandExecutor,
-                            )
-                            .map(|response| info!("{:?}", response))
-                            .map_err(|e| error!("{:?}", e))
-                            .ok();
-                        }))
+                        }
+                        Some(times_to_alert)
                     }
                 }
                 _ => None,
             }
+        })
+        .flatten()
+        .map(|time_to_alert: i64| -> Box<Fn() -> () + Send> {
+            let from = from.clone();
+            let to = to.clone();
+            let twilio_account_id = twilio_account_id.clone();
+            let twilio_access_token = twilio_access_token.clone();
+            let t = time_to_alert.clone();
+
+            Box::new(move || {
+                thread::sleep(native_time::Duration::from_millis(t as u64));
+                twilio::send_text_message(
+                    &from,
+                    &to,
+                    &twilio_account_id,
+                    &twilio_access_token,
+                    &twilio::CommandExecutor,
+                )
+                .map(|response| info!("{:?}", response))
+                .map_err(|e| error!("{:?}", e))
+                .ok();
+            })
         })
         .collect();
 
