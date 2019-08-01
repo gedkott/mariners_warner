@@ -1,8 +1,8 @@
-use chrono::format::ParseError;
 use chrono::prelude::*;
 use chrono::Utc;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Game {
     PerfectlyScheduledGame {
         start_date_time: DateTime<Utc>,
@@ -25,12 +25,12 @@ pub fn parse_game_from(csv_row: &[&str]) -> Option<Game> {
     let start_time = csv_row.get(1).and_then(parse_start_time);
 
     match (&start_day, &start_time) {
-        (Some(x), Some(y)) => create_perfect_game(x, y),
-        (Some(x), _) => Some(Game::GameWithDay {
-            start_day: x.to_string(),
+        (Some(date), Some(time)) => create_perfect_game(date, time),
+        (Some(day), _) => Some(Game::GameWithDay {
+            start_day: day.to_string(),
         }),
-        (_, Some(y)) => Some(Game::GameWithTime {
-            start_time: y.to_string(),
+        (_, Some(t)) => Some(Game::GameWithTime {
+            start_time: t.to_string(),
         }),
         _ => Some(Game::UnclearGame {
             start_day,
@@ -60,30 +60,37 @@ fn contains_number_like_chars(c: &str) -> bool {
     c.chars().any(char::is_numeric)
 }
 
-fn create_perfect_game(x: &str, y: &str) -> Option<Game> {
-    parse_date_time(x, y)
+fn create_perfect_game(date_str: &str, time_str: &str) -> Option<Game> {
+    let iso_8061_ts_start = transform_mariners_date(date_str);
+
+    let iso_8061_ts_end = transform_mariners_time(time_str);
+
+    let date_time = iso_8061_ts_start + "T" + &iso_8061_ts_end;
+
+    date_time.parse::<DateTime<Utc>>()
         .ok()
         .map(|dt| Game::PerfectlyScheduledGame {
             start_date_time: dt,
         })
 }
 
-fn parse_date_time(date_str: &str, time_str: &str) -> Result<DateTime<Utc>, ParseError> {
-    transform_mariners_date_and_time(date_str, time_str).parse::<DateTime<Utc>>()
-}
-
-fn transform_mariners_date_and_time(date_str: &str, time_str: &str) -> String {
+fn transform_mariners_date(date_str: &str) -> String {
     let date_parts: Vec<&str> = date_str.split('/').collect();
-    let legit: String = match date_parts.as_slice() {
+    match date_parts.as_slice() {
         [month, day, year] => {
             ["20".to_owned() + year, month.to_string(), day.to_string()].join("-")
         }
         _ => date_str.to_owned(),
-    };
+    }.replace("/", "-")
+}
 
+fn transform_mariners_time(time_str: &str) -> String {
     let time_and_meridiem: Vec<&str> = time_str.split(' ').collect();
 
-    let time_pieces: Vec<u8> = time_and_meridiem[0]
+    let time = time_and_meridiem[0];
+    let meridiem = time_and_meridiem[1];
+
+    let time_pieces: Vec<u8> = time
         .split(':')
         .map(|x| {
             let f = x.parse::<u8>();
@@ -91,13 +98,12 @@ fn transform_mariners_date_and_time(date_str: &str, time_str: &str) -> String {
         })
         .collect();
 
-    let hours_in_24_hr_format = from_12_hr_fmt_to_24_hr_ft(time_pieces[0], time_and_meridiem[1]);
+    let hour = time_pieces[0];
+    let minute = time_pieces[1];
 
-    let iso_8061_ts_start = legit.replace("/", "-") + "T" + &hours_in_24_hr_format;
+    let hours_in_24_hr_format = from_12_hr_fmt_to_24_hr_ft(hour, meridiem);
 
-    let iso_8061_ts_end = ":".to_owned() + &time_pieces[1].to_string() + ":00.0000000-0700";
-
-    iso_8061_ts_start + &iso_8061_ts_end
+    hours_in_24_hr_format + ":" + &minute.to_string() + ":00.0000000-0700"
 }
 
 fn from_12_hr_fmt_to_24_hr_ft(hour: u8, meridian: &str) -> String {

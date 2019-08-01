@@ -6,16 +6,18 @@ extern crate time;
 extern crate log;
 extern crate simplelog;
 
-use chrono::{Duration, FixedOffset, Utc};
-use simplelog::*;
+use chrono::{Duration, FixedOffset, Utc, TimeZone};
+use simplelog::{CombinedLogger, WriteLogger, LevelFilter, Config};
 use std::collections::HashMap;
 use std::fs::File;
 use std::{fs, thread, time as native_time};
+use std::io::prelude::*;
 
 mod async_latch;
 mod csv_reader;
 mod game_parser;
 mod twilio;
+mod dashboard;
 
 fn main() {
     CombinedLogger::init(vec![WriteLogger::new(
@@ -65,35 +67,53 @@ fn main() {
         })
         .collect();
 
-    perfectly_scheduled_games.push(fake_game);
+    let mut games = vec![fake_game];
+    games.append(&mut perfectly_scheduled_games);
 
-    let jobs = perfectly_scheduled_games
-        .into_iter()
+    let game_statuses: Vec<dashboard::GameInfo> = games
+        .iter()
+        .map(|game| {
+            dashboard::GameInfo {
+                game,
+                status: dashboard::WarningStatus::Waiting
+            }
+        })
+        .collect();
+
+    let s = serde_json::to_string(&game_statuses).expect("Could not seralize into string");
+    let mut file = File::create("foo.txt").expect("Could not open file to write");
+    file.write_all(s.as_bytes()).expect("Could not open write string to file");
+
+    let jobs: Vec<Box<Fn() -> () + Send>> = games
+        .iter()
         .filter_map(|game| -> Option<Vec<i64>> {
             match game {
                 game_parser::Game::PerfectlyScheduledGame { start_date_time } => {
-                    let game_time: i64 =
+                    let time_betwen_now_and_game: i64 =
                         start_date_time.timestamp_millis() - Utc::now().timestamp_millis();
-                    if game_time <= 0 {
+                    if time_betwen_now_and_game <= 0 {
                         None
                     } else {
                         let mut times_to_alert: Vec<i64> = (1..4)
                             .map(|hours: i64| -> Vec<i64> {
-                                let duration = Duration::hours(hours);
+                                let duration = Duration::hours(hours).num_milliseconds();
                                 let times_to_go =
-                                    vec![start_date_time - duration, start_date_time + duration];
+                                    vec![start_date_time.timestamp_millis() - duration, start_date_time.timestamp_millis() + duration];
                                 times_to_go
-                                    .iter()
-                                    .map(|x| x.timestamp_millis())
+                                    .into_iter()
                                     .collect()
                             })
                             .flatten()
                             .collect();
-                        times_to_alert.push(game_time);
+                        times_to_alert.push(start_date_time.timestamp_millis());
                         for time in &times_to_alert {
+                            info!("going to text at: {:?}", Utc.timestamp_millis(*time).with_timezone(&FixedOffset::west(7 * 3600)).to_rfc2822() );
                             info!(
-                                "sleeping for {:?} (u64) for game on {:?} at {:?}",
+                                "sleeping for {:?} (u64) which is until {:?} for game on {:?} at {:?}",
                                 *time as u64,
+                                Utc.timestamp_millis(*time)
+                                    .with_timezone(&FixedOffset::west(7 * 3600))
+                                    .time(),
                                 start_date_time
                                     .with_timezone(&FixedOffset::west(7 * 3600))
                                     .date(),
@@ -114,7 +134,7 @@ fn main() {
             let to = to.clone();
             let twilio_account_id = twilio_account_id.clone();
             let twilio_access_token = twilio_access_token.clone();
-            let t = time_to_alert.clone();
+            let t = time_to_alert;
 
             Box::new(move || {
                 thread::sleep(native_time::Duration::from_millis(t as u64));
