@@ -107,13 +107,11 @@ fn main() {
                             .collect();
                         times_to_alert.push(start_date_time.timestamp_millis());
                         for time in &times_to_alert {
-                            info!("going to text at: {:?}", Utc.timestamp_millis(*time).with_timezone(&FixedOffset::west(7 * 3600)).to_rfc2822() );
                             info!(
-                                "sleeping for {:?} (u64) which is until {:?} for game on {:?} at {:?}",
-                                *time as u64,
+                                "going to text at {:?} for game on {:?} at {:?}",
                                 Utc.timestamp_millis(*time)
                                     .with_timezone(&FixedOffset::west(7 * 3600))
-                                    .time(),
+                                    .to_rfc2822(),
                                 start_date_time
                                     .with_timezone(&FixedOffset::west(7 * 3600))
                                     .date(),
@@ -134,10 +132,15 @@ fn main() {
             let to = to.clone();
             let twilio_account_id = twilio_account_id.clone();
             let twilio_access_token = twilio_access_token.clone();
-            let t = time_to_alert;
+            let time_to_sleep = native_time::Duration::from_millis((time_to_alert - Utc::now().timestamp_millis()) as u64);
+
+            info!(
+                "sleeping for {:?}",
+                time_to_sleep,
+            );
 
             Box::new(move || {
-                thread::sleep(native_time::Duration::from_millis(t as u64));
+                thread::sleep(time_to_sleep);
                 twilio::send_text_message(
                     &from,
                     &to,
