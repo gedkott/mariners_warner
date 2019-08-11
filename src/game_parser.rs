@@ -1,6 +1,6 @@
 use chrono::prelude::*;
 use chrono::Utc;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Game {
@@ -67,7 +67,8 @@ fn create_perfect_game(date_str: &str, time_str: &str) -> Option<Game> {
 
     let date_time = iso_8061_ts_start + "T" + &iso_8061_ts_end;
 
-    date_time.parse::<DateTime<Utc>>()
+    date_time
+        .parse::<DateTime<Utc>>()
         .ok()
         .map(|dt| Game::PerfectlyScheduledGame {
             start_date_time: dt,
@@ -81,7 +82,8 @@ fn transform_mariners_date(date_str: &str) -> String {
             ["20".to_owned() + year, month.to_string(), day.to_string()].join("-")
         }
         _ => date_str.to_owned(),
-    }.replace("/", "-")
+    }
+    .replace("/", "-")
 }
 
 fn transform_mariners_time(time_str: &str) -> String {

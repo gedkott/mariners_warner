@@ -2,6 +2,14 @@ use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone)]
+pub struct TwilioConfig {
+    pub from: String,
+    pub to: String,
+    pub twilio_account_id: String,
+    pub twilio_access_token: String,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum SMSError {
     TwilioResponseError { error: String },
