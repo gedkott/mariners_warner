@@ -13,7 +13,7 @@ pub struct TwilioConfig {
 #[derive(Debug, PartialEq)]
 pub enum SMSError {
     TwilioResponseError { error: String },
-    SerdeError { error: String },
+    SerdeError { error: String, raw_response: String },
     ExecutionError { error: String },
 }
 
@@ -22,6 +22,7 @@ pub trait SMSExecutor {
         &self,
         from: &str,
         to: &str,
+        body: &str,
         account_id: &str,
         access_token: &str,
     ) -> Result<std::process::Output, std::io::Error>;
@@ -32,10 +33,11 @@ pub fn send_text_message(
     to: &str,
     account_id: &str,
     access_token: &str,
+    text_content: &str,
     sms_executor: &SMSExecutor,
 ) -> Result<TwilioResponse, SMSError> {
     sms_executor
-        .execute(from, to, account_id, access_token)
+        .execute(from, to, text_content, account_id, access_token)
         .map_err(|error| SMSError::ExecutionError {
             error: error.to_string(),
         })
@@ -52,6 +54,7 @@ fn convert_to_string(output: std::process::Output) -> Result<String, SMSError> {
 fn deserialize_twilio_response(response: &str) -> Result<TwilioResponse, SMSError> {
     serde_json::from_str(response).map_err(|error| SMSError::SerdeError {
         error: error.to_string(),
+        raw_response: response.to_string(),
     })
 }
 
@@ -62,6 +65,7 @@ impl SMSExecutor for CommandExecutor {
         &self,
         from: &str,
         to: &str,
+        body: &str,
         account_id: &str,
         access_token: &str,
     ) -> Result<std::process::Output, std::io::Error> {
@@ -70,12 +74,12 @@ impl SMSExecutor for CommandExecutor {
             .arg(format!(
                 "
         curl -X POST https://api.twilio.com/2010-04-01/Accounts/{}/Messages.json \
-            --data-urlencode \"Body=A Mariners Home Game is Starting\" \
+            --data-urlencode \"Body={}\" \
             --data-urlencode \"From=+1{}\" \
             --data-urlencode \"To=+1{}\" \
             -u {}:{}
                     ",
-                account_id, from, to, account_id, access_token
+                account_id, body, from, to, account_id, access_token
             ))
             .output()
     }
@@ -127,6 +131,7 @@ mod tests {
             _: &str,
             _: &str,
             _: &str,
+            _: &str,
         ) -> Result<std::process::Output, std::io::Error> {
             let data = r#"
             {
@@ -169,6 +174,7 @@ mod tests {
             _: &str,
             _: &str,
             _: &str,
+            _: &str,
         ) -> Result<std::process::Output, std::io::Error> {
             let custom_error = std::io::Error::new(std::io::ErrorKind::Other, "oh no!");
             Err(custom_error)
@@ -182,6 +188,7 @@ mod tests {
             "0987654321",
             "ABCD1234",
             "A1B2C3D4",
+            "SUPPP",
             &SuccesfulMockExecutor,
         )
         .unwrap();
@@ -218,6 +225,7 @@ mod tests {
             "0987654321",
             "ABCD1234",
             "A1B2C3D4",
+            "SUPPP",
             &FailingMockExecutor,
         )
         .err();

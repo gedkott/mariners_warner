@@ -49,9 +49,9 @@ fn main() {
 
     let jobs: Vec<Box<Fn() -> () + Send>> = games
         .iter()
-        .filter_map(|game| -> Option<Vec<i64>> { get_times_to_alert(game) })
+        .filter_map(|game| -> Option<Vec<GameAlert>> { get_times_to_alert(game) })
         .flatten()
-        .map(|time_to_alert: i64| -> Box<Fn() -> () + Send> {
+        .map(|time_to_alert: GameAlert| -> Box<Fn() -> () + Send> {
             create_alert_job(time_to_alert, twilio_config.clone())
         })
         .collect();
@@ -59,7 +59,12 @@ fn main() {
     async_latch::wait(jobs)
 }
 
-fn get_times_to_alert(game: &game_parser::Game) -> Option<Vec<i64>> {
+struct GameAlert {
+    purpose: String,
+    time_to_alert: i64,
+}
+
+fn get_times_to_alert(game: &game_parser::Game) -> Option<Vec<GameAlert>> {
     match game {
         game_parser::Game::PerfectlyScheduledGame { start_date_time } => {
             let time_betwen_now_and_game: i64 =
@@ -67,22 +72,40 @@ fn get_times_to_alert(game: &game_parser::Game) -> Option<Vec<i64>> {
             if time_betwen_now_and_game <= 0 {
                 None
             } else {
-                let mut times_to_alert: Vec<i64> = (1..4)
-                    .map(|hours: i64| -> Vec<i64> {
+                let mut game_alerts: Vec<GameAlert> = (1..4)
+                    .map(|hours: i64| -> Vec<GameAlert> {
                         let duration = Duration::hours(hours).num_milliseconds();
+
+                        let n_hours_before = start_date_time.timestamp_millis() - duration;
+                        let n_hours_after = start_date_time.timestamp_millis() + duration;
+
+                        let before_game_purpose =
+                            format!("a mariners game is starting in {} hours", hours);
+                        let after_game_purpose =
+                            format!("a mariners game ended {} hours ago", hours);
+
                         let times_to_go = vec![
-                            start_date_time.timestamp_millis() - duration,
-                            start_date_time.timestamp_millis() + duration,
+                            GameAlert {
+                                time_to_alert: n_hours_before,
+                                purpose: before_game_purpose,
+                            },
+                            GameAlert {
+                                time_to_alert: n_hours_after,
+                                purpose: after_game_purpose,
+                            },
                         ];
                         times_to_go.into_iter().collect()
                     })
                     .flatten()
                     .collect();
-                times_to_alert.push(start_date_time.timestamp_millis());
-                for time in &times_to_alert {
+                game_alerts.push(GameAlert {
+                    time_to_alert: start_date_time.timestamp_millis(),
+                    purpose: "a mariners game is starting now".to_string(),
+                });
+                for game_alert in &game_alerts {
                     info!(
                         "going to text at {:?} for game on {:?} at {:?}",
-                        Utc.timestamp_millis(*time)
+                        Utc.timestamp_millis(game_alert.time_to_alert)
                             .with_timezone(&FixedOffset::west(7 * 3600))
                             .to_rfc2822(),
                         start_date_time
@@ -93,16 +116,17 @@ fn get_times_to_alert(game: &game_parser::Game) -> Option<Vec<i64>> {
                             .time()
                     );
                 }
-                Some(times_to_alert)
+                Some(game_alerts)
             }
         }
         _ => None,
     }
 }
 
-fn create_alert_job(time_to_alert: i64, t: twilio::TwilioConfig) -> Box<Fn() -> () + Send> {
-    let time_to_sleep =
-        native_time::Duration::from_millis((time_to_alert - Utc::now().timestamp_millis()) as u64);
+fn create_alert_job(game_alert: GameAlert, t: twilio::TwilioConfig) -> Box<Fn() -> () + Send> {
+    let time_to_sleep = native_time::Duration::from_millis(
+        (game_alert.time_to_alert - Utc::now().timestamp_millis()) as u64,
+    );
 
     info!("sleeping for {:?}", time_to_sleep,);
 
@@ -113,6 +137,7 @@ fn create_alert_job(time_to_alert: i64, t: twilio::TwilioConfig) -> Box<Fn() -> 
             &t.to,
             &t.twilio_account_id,
             &t.twilio_access_token,
+            &game_alert.purpose,
             &twilio::CommandExecutor,
         )
         .map(|response| info!("{:?}", response))
