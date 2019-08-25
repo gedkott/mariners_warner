@@ -129,7 +129,7 @@ mod tests {
             &self,
             _: &str,
             _: &str,
-            _: &str,
+            body: &str,
             _: &str,
             _: &str,
         ) -> Result<std::process::Output, std::io::Error> {
@@ -137,7 +137,7 @@ mod tests {
             {
                 "account_sid": "ABCD1234",
                 "api_version": "2010-04-01",
-                "body": "Hello! 👍",
+                "body": "{body}",
                 "date_created": "Thu, 30 Jul 2015 20:12:31 +0000",
                 "date_sent": "Thu, 30 Jul 2015 20:12:33 +0000",
                 "date_updated": "Thu, 30 Jul 2015 20:12:33 +0000",
@@ -158,6 +158,8 @@ mod tests {
                 "to": "+14155552345",
                 "uri": "/2010-04-01/Accounts/ABCD1234/Messages/SMXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.json"
             }"#;
+
+            let data = data.replace("{body}", body);
 
             Ok(std::process::Output {
                 stdout: data.as_bytes().to_vec(),
@@ -195,7 +197,7 @@ mod tests {
         assert_eq!(TwilioResponse::SendMessage {
             account_sid: "ABCD1234".to_string(),
             api_version: "2010-04-01".to_string(),
-            body: "Hello! 👍".to_string(),
+            body: "SUPPP".to_string(),
             date_created: "Thu, 30 Jul 2015 20:12:31 +0000".to_string(),
             date_sent: Some("Thu, 30 Jul 2015 20:12:33 +0000".to_string()),
             date_updated: "Thu, 30 Jul 2015 20:12:33 +0000".to_string(),
@@ -243,7 +245,7 @@ mod tests {
             {
                 "account_sid": "ABCD1234",
                 "api_version": "2010-04-01",
-                "body": "Hello! 👍",
+                "body": "HI!",
                 "date_created": "Thu, 30 Jul 2015 20:12:31 +0000",
                 "date_sent": "Thu, 30 Jul 2015 20:12:33 +0000",
                 "date_updated": "Thu, 30 Jul 2015 20:12:33 +0000",
@@ -275,7 +277,7 @@ mod tests {
         assert_eq!(TwilioResponse::SendMessage {
             account_sid: "ABCD1234".to_string(),
             api_version: "2010-04-01".to_string(),
-            body: "Hello! 👍".to_string(),
+            body: "HI!".to_string(),
             date_created: "Thu, 30 Jul 2015 20:12:31 +0000".to_string(),
             date_sent: Some("Thu, 30 Jul 2015 20:12:33 +0000".to_string()),
             date_updated: "Thu, 30 Jul 2015 20:12:33 +0000".to_string(),
