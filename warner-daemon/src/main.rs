@@ -13,11 +13,11 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{fs, thread, time as native_time};
 
-mod async_latch;
-mod csv_reader;
-mod dashboard;
-mod game_parser;
-mod twilio;
+use async_latch;
+use csv_reader;
+use dashboard;
+use game_parser;
+use twilio;
 
 fn main() {
     CombinedLogger::init(vec![WriteLogger::new(

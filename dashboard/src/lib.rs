@@ -1,4 +1,4 @@
-use crate::game_parser;
+use game_parser;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]

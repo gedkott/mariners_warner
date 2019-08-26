@@ -1,0 +1,22 @@
+[package]
+name = "warner-daemon"
+version = "0.1.0"
+authors = ["Gedalia Kott <gedkott@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-latch = { path = "../async-latch"  }
+csv-reader = { path = "../csv-reader"  }
+game-parser = { path = "../game-parser"  }
+twilio = { path = "../twilio"  }
+dashboard = { path = "../dashboard"  }
+
+chrono = { version = "0.4", features = ["serde"]}
+serde = { version = "1.0.91", features = ["derive"] } 
+serde_json = "1.0.39"
+config = "0.9.3"
+time = "0.1"
+log = "0.4.6"
+simplelog = "0.5.3"
