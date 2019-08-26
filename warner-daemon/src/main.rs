@@ -1,17 +1,15 @@
-extern crate chrono;
-extern crate config;
-extern crate time;
-
 #[macro_use]
 extern crate log;
-extern crate simplelog;
 
 use chrono::{Duration, FixedOffset, TimeZone, Utc};
-use simplelog::{CombinedLogger, Config, LevelFilter, WriteLogger};
+use config::{Config, File as ConfigFile};
+use serde_json::to_string;
+use simplelog::{CombinedLogger, Config as LogConfig, LevelFilter, WriteLogger};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::{fs, thread, time as native_time};
+use time::Duration as TimeDuration;
 
 use async_latch;
 use csv_reader;
@@ -22,7 +20,7 @@ use twilio;
 fn main() {
     CombinedLogger::init(vec![WriteLogger::new(
         LevelFilter::Info,
-        Config::default(),
+        LogConfig::default(),
         File::create("mariners_warner.log").unwrap(),
     )])
     .expect("could not initialize logging infrastructure");
@@ -35,7 +33,7 @@ fn main() {
 
     let real_rows = csv_reader::read_rows(&contents);
 
-    let fake_start_date_time = Utc::now() + time::Duration::seconds(5);
+    let fake_start_date_time = Utc::now() + TimeDuration::seconds(5);
     let fake_game = game_parser::Game::PerfectlyScheduledGame {
         start_date_time: fake_start_date_time,
     };
@@ -155,7 +153,7 @@ fn record_parsed_games(games: &[game_parser::Game]) {
         })
         .collect();
 
-    let s = serde_json::to_string(&game_statuses).expect("Could not seralize into string");
+    let s = to_string(&game_statuses).expect("Could not seralize into string");
     let mut file = File::create("foo.txt").expect("Could not open file to write");
     file.write_all(s.as_bytes())
         .expect("Could not open write string to file")
@@ -174,8 +172,8 @@ fn parse_perfectly_scheduled_games(raw_csv_rows: Vec<Vec<&str>>) -> Vec<game_par
 }
 
 fn get_twilio_config() -> twilio::TwilioConfig {
-    let mut settings = config::Config::default();
-    settings.merge(config::File::with_name("config")).expect(
+    let mut settings = Config::default();
+    settings.merge(ConfigFile::with_name("config")).expect(
         "you must supply a config file named config.toml matching config.template.toml's structure",
     );
     let app_config = settings.try_into::<HashMap<String, String>>().expect(
@@ -187,7 +185,7 @@ fn get_twilio_config() -> twilio::TwilioConfig {
         "config.toml must define a to phone number in the form \"\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d\"",
     );
     let twilio_account_id = app_config
-        .get("twilio_account_id")
+        .get("twilo_account_id")
         .expect("config.toml must define a twilio_account_id");
     let twilio_access_token = app_config
         .get("twilio_access_token")

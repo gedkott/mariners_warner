@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use serde::{Deserialize, Serialize};
+use serde_json::from_str;
 
 #[derive(Clone)]
 pub struct TwilioConfig {
@@ -52,7 +53,7 @@ fn convert_to_string(output: std::process::Output) -> Result<String, SMSError> {
 }
 
 fn deserialize_twilio_response(response: &str) -> Result<TwilioResponse, SMSError> {
-    serde_json::from_str(response).map_err(|error| SMSError::SerdeError {
+    from_str(response).map_err(|error| SMSError::SerdeError {
         error: error.to_string(),
         raw_response: response.to_string(),
     })
@@ -267,7 +268,7 @@ mod tests {
                 "uri": "/2010-04-01/Accounts/ABCD1234/Messages/SMXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.json"
             }"#;
 
-        let response: TwilioResponse = match serde_json::from_str(data) {
+        let response: TwilioResponse = match from_str(data) {
             Ok(r) => r,
             Err(e) => {
                 println!("{}", e);
