@@ -7,7 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-latch = { path = "../async-latch"  }
 csv-reader = { path = "../csv-reader"  }
 game-parser = { path = "../game-parser"  }
 twilio = { path = "../twilio"  }
@@ -19,3 +18,5 @@ config = "0.9.3"
 time = "0.1"
 log = "0.4.6"
 simplelog = "0.5.3"
+futures = "0.1.28"
+tokio = "0.1.22"

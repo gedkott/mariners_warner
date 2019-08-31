@@ -2,7 +2,6 @@
 
 members = [
     "warner-daemon",
-    "async-latch",
     "csv-reader",
     "game-parser",
     "twilio",
