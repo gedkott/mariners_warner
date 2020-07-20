@@ -6,9 +6,7 @@ use futures::Future;
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 
-mod http_executor;
-
-pub use self::http_executor::HTTPExecutor;
+pub mod http_executor;
 
 #[derive(Clone)]
 pub struct TwilioConfig {
@@ -78,7 +76,7 @@ pub fn send_text_message(
     account_id: &str,
     access_token: &str,
     text_content: &str,
-    sms_executor: &SMSExecutor,
+    sms_executor: &dyn SMSExecutor,
 ) -> TwilioResponseFuture {
     let twilio_response = sms_executor
         .execute(from, to, text_content, account_id, access_token)
@@ -154,7 +152,7 @@ mod tests {
             body: &str,
             _: &str,
             _: &str,
-        ) -> Box<Future<Item = std::process::Output, Error = std::io::Error> + Send> {
+        ) -> Box<dyn Future<Item = std::process::Output, Error = std::io::Error> + Send> {
             let data = r#"
             {
                 "account_sid": "ABCD1234",
@@ -199,7 +197,7 @@ mod tests {
             _: &str,
             _: &str,
             _: &str,
-        ) -> Box<Future<Item = std::process::Output, Error = std::io::Error> + Send> {
+        ) -> Box<dyn Future<Item = std::process::Output, Error = std::io::Error> + Send> {
             let custom_error = std::io::Error::new(std::io::ErrorKind::Other, "oh no!");
             Box::new(err(custom_error))
         }
