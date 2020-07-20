@@ -1,6 +1,4 @@
-#[macro_use]
-extern crate log;
-
+use log::{info};
 use chrono::{Duration, FixedOffset, TimeZone, Utc};
 use config::{Config, File as ConfigFile};
 use futures::future::join_all;
@@ -158,7 +156,7 @@ fn create_alert_job(
             error: e.to_string(),
         })
         .and_then(move |_| {
-            let executor = twilio::HTTPExecutor;
+            let executor = twilio::http_executor::HTTPExecutor;
             info!("using executor: {}", executor);
             twilio::send_text_message(
                 &t.from,
